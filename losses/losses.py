@@ -6,14 +6,17 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-def dice_score(preds, targets):
+def dice_score(preds, targets, labeled_list=None):
   # TODO: the way this function is implemented and used assumes
   # a batch size of 1. This could cause bugs.
   if isinstance(preds, tuple):
     preds = preds[0]
-  num = 2*torch.einsum('bcijk, bcijk ->bc', [preds, targets])
-  denom = torch.einsum('bcijk, bcijk -> bc', [preds, preds]) +\
-      torch.einsum('bcijk, bcijk -> bc', [targets, targets]) + 1e-9
+  if not labeled_list:
+    labeled_list = range(preds.shape[2])
+  num = 2*torch.einsum('bcijk, bcijk ->bc', [preds[:, :, labeled_list], targets[:, :, labeled_list]])
+  denom = torch.einsum('bcijk, bcijk -> bc', [preds[:, :, labeled_list], preds[:, :, labeled_list]]) +\
+      torch.einsum('bcijk, bcijk -> bc', [targets[:, :, labeled_list], targets[:, :, labeled_list]]) + 1e-9
+  # slice pred and  target to calculate partial loss
   proportions = torch.div(num, denom) 
   return torch.einsum('bc->c', proportions)
 
@@ -101,9 +104,13 @@ class DiceLoss(nn.Module):
     super(DiceLoss, self).__init__()
 
   def forward(self, preds_and_targets):
-    preds, targets, _ = preds_and_targets
+    if len(preds_and_targets) < 4:
+      labeled_list = range(32)
+      preds, targets, _ = preds_and_targets
+    else:
+      preds, targets, _, labeled_list = preds_and_targets
     num_channels = targets.size()[1]
-    return  num_channels - torch.einsum('c->', dice_score(preds, targets))
+    return  num_channels - torch.einsum('c->', dice_score(preds, targets, labeled_list))  # pass in extra argument
 
 class ReconRegLoss(nn.Module):
   def __init__(self):

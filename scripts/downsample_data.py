@@ -7,8 +7,8 @@ from nilearn.image import resample_img
 import nibabel as nib
 import os
 
-data_dir = '/data/cddunca2/brats2018/'
-scaling = 1.3
+data_dir = '../data/brats2018'
+scaling = 4
 
 filenames = \
    [ data_dir + "/HGG/" + f + "/" for f in os.listdir(data_dir + "/HGG/") ]

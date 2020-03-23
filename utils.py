@@ -83,6 +83,7 @@ class MRISegConfigParser():
     self.weight_decay = config.getfloat('train_params', 'weight_decay')
     self.epochs = config.getint('train_params', 'epochs')
     self.data_dir = config.get('data', 'data_dir')
+    self.test_dir = config.get('data', 'test_dir')
     self.log_dir = config.get('data', 'log_dir')
     self.model_type = config.get('meta', 'model_type')
     self.model_name = config.get('meta', 'model_name')
@@ -137,7 +138,7 @@ def cross_validation(dataset, batch_size=1, k = 5):
     return cv_trainloader, cv_testloader
 
 
-def train(model, loss, optimizer, train_dataloader, device):
+def train(model, loss, optimizer, train_dataloader, device, labeled_list=None):
   total_loss = 0
   model.train()
   for src, target in tqdm(train_dataloader):
@@ -145,7 +146,7 @@ def train(model, loss, optimizer, train_dataloader, device):
     src, target = src.to(device, dtype=torch.float),\
         target.to(device, dtype=torch.float)
     output = model(src)
-    cur_loss = loss((output, target, src))
+    cur_loss = loss((output, target, src, labeled_list))  # TODO: pass slice number
     total_loss += cur_loss
     cur_loss.backward()
     optimizer.step()
@@ -164,14 +165,14 @@ def _validate(model, loss, dataloader, device, test):
       total_loss += loss((output, target, src))
       total_dice += dice_score(output, target)
       total_dice_agg += agg_dice_score(output, target)
-      #if not test:
-      #  print('saving pred')
-      #  z_mat = torch.zeros(output.shape).to(device)
-      #  o_mat = torch.ones(output.shape).to(device)
-      #  preds = torch.where(output>0.5, o_mat, z_mat)
+      if not test:
+       print('saving pred')
+       z_mat = torch.zeros(output.shape).to(device)
+       o_mat = torch.ones(output.shape).to(device)
+       preds = torch.where(output>0.5, o_mat, z_mat)
 
-      #  save_prediction(src, target, preds, 'scratch', 'test_out')
-      #  break
+       save_prediction(src, target, preds, 'scratch', 'test_out')
+       break
      
 
     avg_dice = total_dice / len(dataloader)

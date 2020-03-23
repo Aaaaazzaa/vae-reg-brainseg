@@ -60,13 +60,13 @@ if config.deterministic_train:
 trainp = 285
 testp = 0
 
-brats_data = BraTSDataset(config.data_dir, modes=config.modes, debug=config.debug, dims=config.dims)
+brats_data = BraTSDataset(config.data_dir, modes=config.modes, debug=config.debug, dims=config.dims, downsample=4)
 #train_split, test_split = torch.utils.data.random_split(brats_data, [trainp, testp]) 
 #
 #trainloader = DataLoader(train_split, batch_size=1, shuffle=True, num_workers=0)
 #testloader = DataLoader(test_split, batch_size=1, shuffle=True, num_workers=0)
 trainloader = DataLoader(brats_data, batch_size=1, shuffle=True, num_workers=0)
-testloader = None
+testloader = DataLoader(BraTSDataset(config.test_dir, modes=config.modes, debug=config.debug, dims=config.dims, downsample=4))
 # specify in config?
 input_channels = len(config.modes)
 output_channels = len(config.labels)
@@ -92,9 +92,10 @@ optimizer = \
 writer = SummaryWriter(log_dir=config.log_dir+config.model_name+'/')
 scheduler = PolynomialLR(optimizer, config.epochs)
 loss = losses.build(config)
-
+random.seed(0)
+labeled_list = [random.randint(0,31) for _ in range(int(32*.5))]
 for epoch in range(1, config.epochs):
-  train(model, loss, optimizer, trainloader, device)
+  train(model, loss, optimizer, trainloader, device, labeled_list)
   
   #Only validate every x epochs
   if epoch % 5 != 0:
@@ -113,15 +114,15 @@ for epoch in range(1, config.epochs):
   writer.add_scalar('Dice/train/wt_agg', train_dice_agg[1], epoch)
   writer.add_scalar('Dice/train/tc_agg', train_dice_agg[2], epoch)
 
-  if test_dice and test_loss:
+  if test_dice is not None and test_loss is not None:
     writer.add_scalar('Loss/test', test_loss, epoch)
     writer.add_scalar('Dice/test/ncr&net', test_dice[0], epoch)
     writer.add_scalar('Dice/test/ed', test_dice[1], epoch)
     writer.add_scalar('Dice/test/et', test_dice[2], epoch)
     # TODO: make this just test and add agg score
     print("epoch: {}\ttrain loss: {}\ttrain dice: {}\t\
-        test loss: {}\t test dice: {}".format(epoch, train_loss, 
-        [ d.item() for d in train_dice ], test_loss, [ d.item() for d in test_dice ])) 
+        test loss: {}\t test dice: {}".format(epoch, train_loss,
+        [ d.item() for d in train_dice ], test_loss, [ d.item() for d in test_dice ]))
   print("epoch: {} ||| train loss: {} ||| train dice: {} ||| train dice agg: {}".format(epoch, 
     train_loss, [ d.item() for d in train_dice ], [ d.item() for d in train_dice_agg ])) 
   save_model(config.model_name, epoch, writer, model, optimizer) 

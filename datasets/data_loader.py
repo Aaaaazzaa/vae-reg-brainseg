@@ -8,16 +8,19 @@ from torch.utils.data import Dataset
 
 class BraTSDataset(Dataset):
     def __init__(self, data_dir, modes=['t1', 't1ce', 't2', 'flair'], 
-        debug=False, dims=[240, 240, 155], augment_data = False):
+        debug=False, dims=[240, 240, 155], augment_data = False, downsample=1):
         # store filenames. expects data_dir/{HGG, LGG}/
         # TODO: should HGG and LGG be separated?
+
         self.x_off = 0
         self.y_off = 0
         self.z_off = 0
 
+
+        self.downsample = downsample
         if dims:
-          self.x_off = int((240 - dims[0]) / 4)*2
-          self.y_off = int((240 - dims[1]) / 4)*2
+          self.x_off = int((240//self.downsample - dims[0]) / 4)*2
+          self.y_off = int((240//self.downsample - dims[1]) / 4)*2
           self.z_off = int((155 - dims[2]) / 4)*2
 
         filenames = []
@@ -85,7 +88,7 @@ class BraTSDataset(Dataset):
 
     def _transform_data(self, d):
       t1 = nib.load(d).get_fdata()
-      t1 = t1[self.x_off:240-self.x_off, self.y_off:240-self.y_off, 13:-14]
+      t1 = t1[self.x_off:240//self.downsample-self.x_off, self.y_off:240//self.downsample-self.y_off, 13//self.downsample:-14//self.downsample]
       t1_trans = self.min_max_normalize(t1)
       #t1_trans = self.std_normalize(t1)
 
@@ -108,7 +111,7 @@ class BraTSDataset(Dataset):
       data = [self._transform_data(m[idx]) for m in self.modes]
 
       seg = nib.load(self.segs[idx]).get_fdata()
-      seg = seg[self.x_off:240-self.x_off, self.y_off:240-self.y_off, 13:-14]
+      seg = seg[self.x_off:240//self.downsample-self.x_off, self.y_off:240//self.downsample-self.y_off, 13//self.downsample:-14//self.downsample]
       if self.axis:
         seg = np.flip(seg, axis)
 
